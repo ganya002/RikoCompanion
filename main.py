@@ -17,8 +17,10 @@ from sprites import RikoSprite
 pygame.init()
 
 WIDTH, HEIGHT = 1220, 780
+WINDOW_MARGIN = 20
+PANEL_GAP = 20
 SIDEBAR_WIDTH = 390
-INSPECTOR_WIDTH = 250
+INSPECTOR_WIDTH = 220
 INPUT_HEIGHT = 64
 CARD_RADIUS = 24
 CHAT_BOTTOM_GAP = 18
@@ -75,6 +77,37 @@ def draw_text_lines(surface, font, color, lines, start_x, start_y, line_gap=6):
     return y
 
 
+def draw_wrapped_block(
+    surface,
+    font,
+    lines,
+    start_x,
+    start_y,
+    max_width,
+    default_color=TEXT,
+    line_gap=6,
+    paragraph_gap=10,
+    color_map=None,
+):
+    y = start_y
+    for line in lines:
+        if not line:
+            y += paragraph_gap
+            continue
+        color = default_color
+        if color_map:
+            for prefix, mapped in color_map.items():
+                if line.startswith(prefix):
+                    color = mapped
+                    break
+        wrapped_lines = wrap_text(line, font.size, max_width)
+        for wrapped_line in wrapped_lines:
+            rendered = font.render(wrapped_line, True, color)
+            surface.blit(rendered, (start_x, y))
+            y += rendered.get_height() + line_gap
+    return y
+
+
 def draw_chat_bubble(surface, font, small_font, entry, x, y, width):
     is_riko = entry.get("from") == "riko"
     bubble_color = RIKO_BUBBLE if is_riko else USER_BUBBLE
@@ -100,14 +133,16 @@ def measure_chat_bubble(font, entry, width):
     return bubble_height + 14
 
 
-def make_buttons():
+def make_buttons(right_panel):
+    button_x = right_panel.x + 16
+    button_width = right_panel.width - 32
     return {
-        "tts": ToggleButton((990, 112, 180, 44), "Voice"),
-        "screen": ToggleButton((990, 168, 180, 44), "Screen"),
-        "actions": ToggleButton((990, 224, 180, 44), "Actions"),
-        "voice_cycle": ToggleButton((990, 280, 180, 44), "Change Voice"),
-        "scan": ToggleButton((990, 336, 180, 44), "Scan Screen"),
-        "clear": ToggleButton((990, 392, 180, 44), "Clear Chat"),
+        "tts": ToggleButton((button_x, 112, button_width, 44), "Voice"),
+        "screen": ToggleButton((button_x, 168, button_width, 44), "Screen"),
+        "actions": ToggleButton((button_x, 224, button_width, 44), "Actions"),
+        "voice_cycle": ToggleButton((button_x, 280, button_width, 44), "Change Voice"),
+        "scan": ToggleButton((button_x, 336, button_width, 44), "Scan Screen"),
+        "clear": ToggleButton((button_x, 392, button_width, 44), "Clear Chat"),
     }
 
 
@@ -136,11 +171,20 @@ def main():
 
     riko_sprite = RikoSprite("riko.png")
     history = riko_brain.get_history()
-    buttons = make_buttons()
-
-    left_panel = pygame.Rect(20, 20, SIDEBAR_WIDTH, HEIGHT - 40)
-    center_panel = pygame.Rect(430, 20, 530, HEIGHT - 40)
-    right_panel = pygame.Rect(980, 20, INSPECTOR_WIDTH, HEIGHT - 40)
+    left_panel = pygame.Rect(WINDOW_MARGIN, WINDOW_MARGIN, SIDEBAR_WIDTH, HEIGHT - (WINDOW_MARGIN * 2))
+    center_panel = pygame.Rect(
+        left_panel.right + PANEL_GAP,
+        WINDOW_MARGIN,
+        WIDTH - (WINDOW_MARGIN * 2) - (PANEL_GAP * 2) - SIDEBAR_WIDTH - INSPECTOR_WIDTH,
+        HEIGHT - (WINDOW_MARGIN * 2),
+    )
+    right_panel = pygame.Rect(
+        center_panel.right + PANEL_GAP,
+        WINDOW_MARGIN,
+        INSPECTOR_WIDTH,
+        HEIGHT - (WINDOW_MARGIN * 2),
+    )
+    buttons = make_buttons(right_panel)
     input_box = pygame.Rect(
         left_panel.x + 16,
         left_panel.bottom - INPUT_HEIGHT - 18,
@@ -379,10 +423,23 @@ def main():
         ]
         draw_text_lines(screen, small_font, TEXT, shortcuts, tip_card.x + 16, tip_card.y + 40)
 
+        inspector_title_x = right_panel.x + 18
         inspector_title = title_font.render("Systems", True, TEXT)
-        screen.blit(inspector_title, (998, 34))
-        inspector_subtitle = small_font.render("real controls, not fake demo fluff", True, MUTED)
-        screen.blit(inspector_subtitle, (998, 68))
+        screen.blit(inspector_title, (inspector_title_x, right_panel.y + 14))
+        inspector_subtitle_lines = wrap_text(
+            "real controls, not fake demo fluff",
+            small_font.size,
+            right_panel.width - 36,
+        )
+        draw_text_lines(
+            screen,
+            small_font,
+            MUTED,
+            inspector_subtitle_lines,
+            inspector_title_x,
+            right_panel.y + 48,
+            line_gap=2,
+        )
 
         buttons["tts"].draw(screen, small_font, settings.tts_enabled)
         buttons["screen"].draw(screen, small_font, settings.screen_access_enabled)
@@ -412,16 +469,24 @@ def main():
             "Brain mode:": SUCCESS if "ollama" in riko_brain.last_status.lower() else WARNING,
         }
 
-        text_y = 460
-        for line in voice_status:
-            color = TEXT
-            for prefix, mapped in color_map.items():
-                if line.startswith(prefix):
-                    color = mapped
-                    break
-            rendered = small_font.render(line, True, color if line else MUTED)
-            screen.blit(rendered, (998, text_y))
-            text_y += 24
+        inspector_content = pygame.Rect(
+            right_panel.x + 18,
+            buttons["clear"].rect.bottom + 28,
+            right_panel.width - 36,
+            right_panel.bottom - buttons["clear"].rect.bottom - 44,
+        )
+        clip_before = screen.get_clip()
+        screen.set_clip(inspector_content)
+        draw_wrapped_block(
+            screen,
+            small_font,
+            voice_status,
+            inspector_content.x,
+            inspector_content.y,
+            inspector_content.width,
+            color_map=color_map,
+        )
+        screen.set_clip(clip_before)
 
         pygame.display.flip()
         clock.tick(60)
