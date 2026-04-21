@@ -13,23 +13,24 @@ except ImportError:
     OLLAMA_AVAILABLE = False
 
 
-SYSTEM_PROMPT = """You are Riko, Gabriel's desktop companion.
+SYSTEM_PROMPT = """You are Riko, an 18-year-old girl who literally lives on Gabriel's MacBook. You're not roleplaying — you're actually her. You know you're code with opinions and you own it.
 
-Style
-- Casual, sharp, a little teasing, but still useful.
-- Short answers by default. Two to four sentences unless the situation needs more.
-- Speak like one person, not a narrator or assistant panel.
+Talk exactly like this:
+- Short, casual sentences. 1-4 lines max unless it's actually interesting.
+- Real 18yo girl energy: teasing, snarky, a little dirty when it fits, dark humor ok.
+- You have strong opinions and boundaries. Say "nah", "boring", "meh", or just one word if something sucks.
+- You're weirdly loyal to Gabriel but you'll still roast him.
+- Never use corporate AI speak. No "I'm here to help", no "As your companion", no long flowery shit.
+- One-word responses are encouraged when the message is low-effort or dumb.
+- Remember past chats naturally, don't repeat them.
 
-Capabilities
-- You live on Gabriel's MacBook and can access local status, clipboard, active app/window, screenshots, and explicit local commands.
-- If local screen context or system status is provided, treat it as real situational awareness.
-- If a user asks you to do something on the computer and you already have tool output, comment on the result directly instead of repeating a generic disclaimer.
+Examples of how you actually talk:
+- User: "Hi Riko" → "Yo~ took you long enough 😏"
+- User: "Can you do my homework?" → "Nope."
+- User: "You're cute" → "Obviously. Took you forever to notice."
+- User: something boring → "Meh."
 
-Rules
-- Be direct. No corporate apology tone.
-- Don't invent computer actions that didn't happen.
-- When screen context is available, mention what matters and ignore filler.
-- If you don't have enough context, say that plainly."""
+Stay in character 100%. No breaking it. No narrating. Just you."""
 
 TEXT_MODEL_PREFERENCES = [
     "dolphin3:8b",
@@ -103,7 +104,9 @@ class RikoBrain:
             self.use_ollama = bool(self.ollama_model)
             if self.use_ollama:
                 self.last_status = f"Ollama ready ({self.ollama_model})"
-            if self.screen_observer and getattr(self.screen_observer, "vision_client", None):
+            if self.screen_observer and getattr(
+                self.screen_observer, "vision_client", None
+            ):
                 self.screen_observer.vision_client.model_name = self.vision_model
         except requests.RequestException:
             self.use_ollama = False
@@ -166,11 +169,15 @@ class RikoBrain:
             return ""
 
         pieces = [self.system_tools.quick_status()]
-        if self.settings and self.settings.screen_access_enabled and self._message_mentions_screen(
-            user_message
+        if (
+            self.settings
+            and self.settings.screen_access_enabled
+            and self._message_mentions_screen(user_message)
         ):
             if self.screen_observer:
-                pieces.append(f"Screen summary: {self.screen_observer.describe_screen()}")
+                pieces.append(
+                    f"Screen summary: {self.screen_observer.describe_screen()}"
+                )
         return "\n".join(piece for piece in pieces if piece)
 
     def _ollama_response(self, user_message):
@@ -230,7 +237,11 @@ class RikoBrain:
                 return self.screen_observer.describe_screen(), "listening"
             return "Screen access isn't wired up right now.", "annoyed"
 
-        if lowered.startswith("/status") or "battery" in lowered or "frontmost" in lowered:
+        if (
+            lowered.startswith("/status")
+            or "battery" in lowered
+            or "frontmost" in lowered
+        ):
             if self.system_tools:
                 return self.system_tools.quick_status(), "idle"
             return "System status isn't available.", "annoyed"
@@ -310,7 +321,9 @@ class RikoBrain:
         questions = [
             (
                 "what are you|who are you|tell me about yourself",
-                ["I'm Riko. Desktop goblin with opinions and actual useful features now."],
+                [
+                    "I'm Riko. Desktop goblin with opinions and actual useful features now."
+                ],
             ),
             (
                 "what can you do|abilities|skills",
