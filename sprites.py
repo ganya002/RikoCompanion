@@ -2,7 +2,7 @@ import pygame
 import os
 
 
-class RikoSprite:
+class NilsSprite:
     def __init__(self, image_path="riko.png", gif_path="animation.gif"):
         self.png_scale = 3
         self.bounce_offset = 0

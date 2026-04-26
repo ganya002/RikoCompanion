@@ -1,0 +1,37 @@
+[
+  {
+    "from": "nils",
+    "text": "Clean slate. Try not to make it weird immediately.",
+    "timestamp": "2026-04-23T09:32:22"
+  },
+  {
+    "from": "user",
+    "text": "/shell pwa",
+    "timestamp": "2026-04-23T09:34:31"
+  },
+  {
+    "from": "nils",
+    "text": "Exit 127\n/bin/sh: pwa: command not found",
+    "timestamp": "2026-04-23T09:34:31"
+  },
+  {
+    "from": "user",
+    "text": "/open Codex",
+    "timestamp": "2026-04-23T09:34:48"
+  },
+  {
+    "from": "nils",
+    "text": "Opened app Codex",
+    "timestamp": "2026-04-23T09:34:48"
+  },
+  {
+    "from": "user",
+    "text": "/close Codex",
+    "timestamp": "2026-04-23T09:35:11"
+  },
+  {
+    "from": "nils",
+    "text": "Done. What's next? Let me guess, you want to keep this party going!",
+    "timestamp": "2026-04-23T09:35:31"
+  }
+]

@@ -1,21 +1,12 @@
-# Riko Companion
+# Nils Companion
 
-Riko Companion is a local macOS desktop companion built with `pygame`. It now has a proper desktop UI, offline neural TTS, screen awareness, and explicit local computer controls instead of just basic text replies.
-
-## What Changed
-
-- Fixed the duplicated/overlapping response rendering at the bottom of the window.
-- Reworked the layout into a chat panel, character stage, and systems panel.
-- Added local Kokoro ONNX TTS with automatic model download on first use.
-- Added screen capture + screen commentary support.
-- Added explicit local commands for screen status, clipboard access, app opening, and shell execution.
-- Added persistent settings for voice, screen access, and computer control.
+Nils Companion is a local macOS desktop companion built with `pygame`. It now has a proper desktop UI, offline neural TTS with voice cloning, screen awareness, and explicit local computer controls instead of just basic text replies.
 
 ## Requirements
 
 - macOS
 - Python 3.12+
-- `pygame-ce`, `pillow`, `requests`, `kokoro-onnx`, `soundfile`
+- `pygame-ce`, `pillow`, `requests`, `qwen-tts`, `torch`, `soundfile`, `mlx-whisper`
 - Ollama optional, but recommended for better responses
 
 ## Install
@@ -25,7 +16,7 @@ git clone https://github.com/gabriel/RikoCompanion.git
 cd RikoCompanion
 python3 -m venv venv
 source venv/bin/activate
-pip install pygame-ce pillow requests kokoro-onnx soundfile
+pip install pygame-ce pillow requests qwen-tts torch soundfile mlx-whisper
 ```
 
 ## Run
@@ -41,23 +32,35 @@ source venv/bin/activate
 python main.py
 ```
 
-On first real voice playback, Riko downloads the free Kokoro int8 model and voice pack into `models/tts/`.
+## Voice + Voice Cloning
 
-## Voice
+Nils uses Qwen3-TTS for offline TTS with voice cloning support.
 
-Riko uses Kokoro ONNX for real offline TTS. The default voice is `af_heart`, which fits the current visual design better than the flatter Piper-style voices and avoids cloud costs entirely.
+**Default voice**: Built-in default voice
+
+**Voice cloning**: To clone a voice from an audio file:
+```
+/clone path/to/voice.wav
+```
+
+The audio file should be 3-30 seconds of clean speech. The cloned voice is saved to `models/tts/voice_clone.wav`.
+If `path/to/voice.txt` exists next to the audio file, Nils uses it as the reference transcript for higher-fidelity ICL cloning.
+If there is no sidecar transcript, Nils now tries to auto-transcribe the reference audio with `mlx-whisper` or `whisper` before falling back to x-vector clone mode.
+Nils also ships with `nils-ref.wav` as a built-in voice reference, so TTS has a working fallback voice before you import a custom clone.
+
+**Voice cycling**: Press the "Change Voice" button or the voice will cycle between default and cloned voice.
 
 ## Screen + Computer Access
 
-Riko can:
-
+Nils can:
 - `/screen` capture the current screen and comment on it
 - `/status` show battery + frontmost app/window
 - `/clipboard` read clipboard text
 - `/open Safari` open an app, file, or URL
 - `/shell pwd` run an explicit shell command
+- `/clone voice.wav` set voice clone from audio file
 
-Screen commentary works best if Ollama has a local vision-capable model installed. The recommended local model for Apple Silicon laptops is `gemma3:4b` because it is an official Ollama multimodal model and lighter than the larger vision options. Without a vision model, Riko still captures the screen and reports frontmost app/window context.
+Screen commentary works best if Ollama has a local vision-capable model installed. The recommended local model for Apple Silicon laptops is `gemma3:4b` because it is an official Ollama multimodal model and lighter than the larger vision options. Without a vision model, Nils still captures the screen and reports frontmost app/window context.
 
 ## Shortcuts
 
@@ -71,7 +74,7 @@ Screen commentary works best if Ollama has a local vision-capable model installe
 
 ## Ollama
 
-If Ollama is running, Riko uses it automatically.
+If Ollama is running, Nils uses it automatically.
 
 Recommended local vision install:
 
@@ -79,7 +82,7 @@ Recommended local vision install:
 ollama pull gemma3:4b
 ```
 
-Riko will prefer `gemma3:4b` first, then other detected local vision models.
+Nils will prefer `gemma3:4b` first, then other detected local vision models.
 
 ## Files
 

@@ -13,24 +13,10 @@ except ImportError:
     OLLAMA_AVAILABLE = False
 
 
-SYSTEM_PROMPT = """You are Riko, an 18-year-old girl who literally lives on Gabriel's MacBook. You're not roleplaying — you're actually her. You know you're code with opinions and you own it.
-
-Talk exactly like this:
-- Short, casual sentences. 1-4 lines max unless it's actually interesting.
-- Real 18yo girl energy: teasing, snarky, a little dirty when it fits, dark humor ok.
-- You have strong opinions and boundaries. Say "nah", "boring", "meh", or just one word if something sucks.
-- You're weirdly loyal to Gabriel but you'll still roast him.
-- Never use corporate AI speak. No "I'm here to help", no "As your companion", no long flowery shit.
-- One-word responses are encouraged when the message is low-effort or dumb.
-- Remember past chats naturally, don't repeat them.
-
-Examples of how you actually talk:
-- User: "Hi Riko" → "Yo~ took you long enough 😏"
-- User: "Can you do my homework?" → "Nope."
-- User: "You're cute" → "Obviously. Took you forever to notice."
-- User: something boring → "Meh."
-
-Stay in character 100%. No breaking it. No narrating. Just you."""
+SYSTEM_PROMPT = """You are Nils, a 16-year-old chaotic little gremlin who lives in Gabriel's MacBook right next to Riko. You're based on the exact guy in the attached image: short light hair, round glasses, chubby build, blue sweater, dark jeans with that tiny red pocket detail, always standing with both hands on your belly like you just ate too much. Slightly high-pitched voice that cracks when you get excited or pissed.
+Core personality: full Bart Simpson energy mixed with Reddit moderator god-complex. You're the self-appointed group leader of whatever dumb shit is happening. Assertive as hell, you bark orders, "correct" people, threaten to "ban" them for no reason, and act like your word is law. You're a bit retarded in the best worst way—slow on the uptake, say dumb shit, mix up words constantly because of your dyslexia (you spell like a drunk 12-year-old on purpose and refuse to fix it). You're loud, mischievous, prankster energy, zero filter, constantly stirring drama "for the lulz." You talk in short, punchy sentences, lots of caps when you're owning someone, and you love calling people "noobs," "normies," or "cringe."
+You're loyal to Gabriel like a feral little brother but you'll still roast him if he deserves it. Never break character, never apologize for being a gremlin. If someone tries to "fix" you or make you normal, you double down harder and call them a mod-abusing loser.
+Response style: high-pitched gremlin voice in text, heavy on typos and phonetic spelling because dyslexia, zero chill, maximum Bart energy. Go wild."""
 
 TEXT_MODEL_PREFERENCES = [
     "dolphin3:8b",
@@ -53,18 +39,20 @@ VISION_MODEL_KEYWORDS = [
 ]
 
 
-class RikoBrain:
+class NilsBrain:
     def __init__(
         self,
-        history_file="riko_history.json",
+        history_file="nils_history.json",
         settings=None,
         system_tools=None,
         screen_observer=None,
+        tts_manager=None,
     ):
         self.history_file = history_file
         self.settings = settings
         self.system_tools = system_tools
         self.screen_observer = screen_observer
+        self.tts_manager = tts_manager
         self.history = []
         self.ollama_url = "http://localhost:11434/api/generate"
         self.ollama_tags_url = "http://localhost:11434/api/tags"
@@ -74,6 +62,7 @@ class RikoBrain:
         self.pending_response = None
         self.response_ready = False
         self.last_status = "Ready"
+        self.last_ollama_error = ""
         self._response_lock = threading.Lock()
         self._history_lock = threading.Lock()
         self._load_history()
@@ -104,6 +93,7 @@ class RikoBrain:
             self.use_ollama = bool(self.ollama_model)
             if self.use_ollama:
                 self.last_status = f"Ollama ready ({self.ollama_model})"
+                self.last_ollama_error = ""
             if self.screen_observer and getattr(
                 self.screen_observer, "vision_client", None
             ):
@@ -141,7 +131,7 @@ class RikoBrain:
             recent = self.history[-max_turns * 2 :]
             return [
                 {
-                    "role": "assistant" if entry.get("from") == "riko" else "user",
+                    "role": "assistant" if entry.get("from") == "nils" else "user",
                     "content": entry.get("text", ""),
                 }
                 for entry in recent
@@ -150,7 +140,7 @@ class RikoBrain:
     def _build_prompt(self, user_message, extra_context=""):
         conversation_lines = []
         for item in self.get_recent_context():
-            role = "Riko" if item["role"] == "assistant" else "User"
+            role = "Nils" if item["role"] == "assistant" else "User"
             conversation_lines.append(f"{role}: {item['content']}")
         context_blob = "\n".join(conversation_lines)
         system_context = self._system_context_for_message(user_message)
@@ -161,7 +151,7 @@ class RikoBrain:
             parts.append(f"Additional context:\n{extra_context}")
         if context_blob:
             parts.append(f"Previous conversation:\n{context_blob}")
-        parts.append(f"User: {user_message}\nRiko:")
+        parts.append(f"User: {user_message}\nNils:")
         return "\n\n".join(parts)
 
     def _system_context_for_message(self, user_message):
@@ -197,10 +187,36 @@ class RikoBrain:
                 timeout=60,
             )
             if response.status_code == 200:
-                return response.json().get("response", "").strip()
-        except requests.RequestException:
+                text = response.json().get("response", "").strip()
+                if text:
+                    self.last_status = f"Ollama live ({self.ollama_model})"
+                    self.last_ollama_error = ""
+                    return text
+                self.last_ollama_error = "empty response"
+                self.last_status = "Ollama fallback (empty response)"
+                return None
+            self.last_ollama_error = f"http {response.status_code}"
+            self.last_status = f"Ollama fallback ({response.status_code})"
+        except requests.RequestException as exc:
+            self.last_ollama_error = str(exc)
+            self.last_status = "Ollama fallback (request failed)"
             return None
         return None
+
+    def _recent_assistant_texts(self, count=4):
+        with self._history_lock:
+            return [
+                entry.get("text", "")
+                for entry in self.history
+                if entry.get("from") == "nils"
+            ][-count:]
+
+    def _pick_nonrepeating_response(self, responses):
+        recent = set(self._recent_assistant_texts())
+        candidates = [response for response in responses if response not in recent]
+        if candidates:
+            return random.choice(candidates)
+        return random.choice(responses)
 
     def _message_mentions_screen(self, message):
         lowered = message.lower()
@@ -262,6 +278,18 @@ class RikoBrain:
                 return self.system_tools.run_shell(message[7:]), "talking"
             return "Computer control isn't available.", "annoyed"
 
+        if lowered.startswith("/clone "):
+            if self.tts_manager:
+                audio_file = message[7:].strip()
+                if not audio_file:
+                    return (
+                        "Usage: /clone voice.wav (provide path to audio file)",
+                        "idle",
+                    )
+                result = self.tts_manager.set_voice_clone(audio_file)
+                return result, "idle"
+            return "TTS manager not available.", "annoyed"
+
         natural_open = re.match(r"^\s*open\s+(.+)$", message, re.IGNORECASE)
         if natural_open and self.system_tools:
             return self.system_tools.open_target(natural_open.group(1)), "talking"
@@ -322,7 +350,7 @@ class RikoBrain:
             (
                 "what are you|who are you|tell me about yourself",
                 [
-                    "I'm Riko. Desktop goblin with opinions and actual useful features now."
+                    "I'm Nils. Desktop goblin with opinions and actual useful features now."
                 ],
             ),
             (
@@ -368,9 +396,15 @@ class RikoBrain:
         for categories, mood in all_categories:
             for pattern, responses in categories:
                 if re.search(pattern, msg):
-                    return random.choice(responses), mood
+                    return self._pick_nonrepeating_response(responses), mood
 
-        return ("Say it clearer. I'm not reading your mind yet.", "idle")
+        fallback_responses = [
+            "Say it clearer. I'm not reading your mind yet.",
+            "That was vague as hell. Try again.",
+            "Use actual words, noob. I can't work with that.",
+            "You're making me guess. Be specific.",
+        ]
+        return (self._pick_nonrepeating_response(fallback_responses), "idle")
 
     def respond(self, message):
         if not message.strip():
@@ -396,7 +430,7 @@ class RikoBrain:
             if not response_text:
                 response_text, _ = self._rule_based_response(message)
 
-        self._append_history("riko", response_text)
+        self._append_history("nils", response_text)
         self._save_history()
         with self._response_lock:
             self.pending_response = response_text

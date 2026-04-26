@@ -1,0 +1,7 @@
+{
+  "tts_enabled": true,
+  "screen_access_enabled": true,
+  "command_access_enabled": true,
+  "voice": "clone",
+  "tts_speed": 1.0
+}
